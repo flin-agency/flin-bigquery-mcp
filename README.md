@@ -2,6 +2,14 @@
 
 MCP server for exploring Google BigQuery and running bounded, read-only GoogleSQL queries. Follows the Python/FastMCP, desktop OAuth, multi-account token storage and `uv` packaging conventions of [flin Search Console MCP](https://github.com/flin-agency/flin-google-search-console-mcp) and [flin Keyword Planner MCP](https://github.com/flin-agency/flin-google-keyword-planner-mcp).
 
+## Mac installation (Claude Desktop)
+
+Download `flin-bigquery-mcp-0.1.0-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
+
+The installer asks for your Google Desktop OAuth client ID and secret, default billing project, optional BigQuery location, and maximum bytes billed per query (default 1 GiB). Configure Google Cloud as described below before the first data request. Google sign-in opens in the browser when needed.
+
+The extension contains the server source and a dependency lock file. It uses the MCPB `uv` runtime with Python 3.12, supports Apple Silicon and Intel Macs, and needs internet access on first launch to install Python/dependencies. A current Claude Desktop version with `uv` extension support is required. The `.mcpb` is an unsigned local extension, not a notarized macOS application; it does not require administrator access or a separate repository checkout. For other MCP clients, use the PyPI or source configuration below.
+
 ## Quickstart
 
 1. Enable the **BigQuery API** in your Google Cloud project and configure billing for query jobs.
@@ -34,7 +42,7 @@ Replace the path and values, then restart the client. `health_check` checks conf
 
 This is a local **stdio** server, usable with clients such as Claude Desktop and Codex that support local MCP processes. No HTTP endpoint or cloud deployment is provisioned.
 
-After the first PyPI release, the published package can be used with `"command": "uvx", "args": ["flin-bigquery-mcp@latest"]`. This repository alone does not mean a PyPI release exists.
+The published package can be used with `"command": "uvx", "args": ["flin-bigquery-mcp@latest"]`.
 
 ## Tools
 
@@ -128,9 +136,11 @@ Optionally set `GOOGLE_APPLICATION_CREDENTIALS` to a credential file outside the
 ```sh
 uv sync --locked --extra dev
 uv run pytest
-uv run ruff check src tests scripts
-uv run ruff format --check src tests scripts
+uv run ruff check src tests scripts mcpb
+uv run ruff format --check src tests scripts mcpb
 uv build
+uv run python scripts/build_mcpb.py
+uv run python scripts/check_mcpb.py dist/mcpb
 ```
 
 `.env.example` documents configuration. The server does not implicitly load `.env`; use client `env` settings or `uv run --env-file .env flin-bigquery-mcp` for local development. Never commit credentials or tokens.

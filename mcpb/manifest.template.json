@@ -1,0 +1,142 @@
+{
+  "manifest_version": "0.4",
+  "name": "flin-bigquery-mcp",
+  "display_name": "flin BigQuery",
+  "description": "Explore BigQuery datasets and run read-only SQL with per-query byte limits.",
+  "long_description": "Connect Google BigQuery to Claude Desktop on macOS. Browse projects, datasets, schemas and table previews. SELECT queries are checked with a dry run and a configurable byte ceiling before submission; they can incur Google Cloud charges. Requires a Desktop OAuth client and BigQuery permissions. Tokens are stored locally. No table write tools are exposed.",
+  "author": {
+    "name": "flin GmbH",
+    "email": "flin@flin.agency",
+    "url": "https://flin.agency"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flin-agency/flin-bigquery-mcp.git"
+  },
+  "homepage": "https://github.com/flin-agency/flin-bigquery-mcp",
+  "documentation": "https://github.com/flin-agency/flin-bigquery-mcp/blob/main/README.md",
+  "support": "https://github.com/flin-agency/flin-bigquery-mcp/issues",
+  "privacy_policies": [
+    "https://github.com/flin-agency/flin-bigquery-mcp/blob/main/PRIVACY.md",
+    "https://policies.google.com/privacy"
+  ],
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "--locked",
+        "--no-dev",
+        "--python",
+        "3.12",
+        "${__dirname}/server.py"
+      ],
+      "env": {
+        "GOOGLE_CLIENT_ID": "${user_config.google_client_id}",
+        "GOOGLE_CLIENT_SECRET": "${user_config.google_client_secret}",
+        "GOOGLE_BIGQUERY_AUTH_MODE": "oauth",
+        "GOOGLE_BIGQUERY_PROJECT": "${user_config.default_project}",
+        "GOOGLE_BIGQUERY_LOCATION": "${user_config.location}",
+        "GOOGLE_BIGQUERY_MAX_BYTES_BILLED": "${user_config.max_bytes_billed}"
+      }
+    }
+  },
+  "user_config": {
+    "google_client_id": {
+      "type": "string",
+      "title": "Google OAuth Client ID",
+      "description": "Client ID from your Google Cloud OAuth client of type Desktop app.",
+      "required": true
+    },
+    "google_client_secret": {
+      "type": "string",
+      "title": "Google OAuth Client Secret",
+      "description": "Client secret belonging to the same Desktop app OAuth client.",
+      "sensitive": true,
+      "required": true
+    },
+    "default_project": {
+      "type": "string",
+      "title": "Default BigQuery project",
+      "description": "Google Cloud project used for discovery and query billing. Can also be supplied per tool call.",
+      "default": "",
+      "required": false
+    },
+    "location": {
+      "type": "string",
+      "title": "BigQuery location",
+      "description": "Must match your dataset, for example EU, US or europe-west6. Leave blank for automatic location selection.",
+      "default": "",
+      "required": false
+    },
+    "max_bytes_billed": {
+      "type": "string",
+      "title": "Maximum bytes billed per query",
+      "description": "Positive integer. Default 1073741824 (1 GiB). Each tool call can lower this ceiling but cannot raise it.",
+      "default": "1073741824",
+      "required": true
+    }
+  },
+  "tools": [
+    {
+      "name": "health_check",
+      "description": "Check local configuration and saved sign-in status."
+    },
+    {
+      "name": "list_projects",
+      "description": "List accessible BigQuery projects."
+    },
+    {
+      "name": "list_datasets",
+      "description": "List datasets in a project."
+    },
+    {
+      "name": "get_dataset",
+      "description": "Inspect dataset location and metadata."
+    },
+    {
+      "name": "list_tables",
+      "description": "List tables and views."
+    },
+    {
+      "name": "get_table",
+      "description": "Inspect nested schema, partitioning and clustering."
+    },
+    {
+      "name": "preview_table",
+      "description": "Preview a bounded page from a physical table."
+    },
+    {
+      "name": "dry_run_query",
+      "description": "Validate a SELECT and estimate scanned bytes."
+    },
+    {
+      "name": "run_query",
+      "description": "Submit a bounded SELECT query; may incur Google charges."
+    },
+    {
+      "name": "get_query_results",
+      "description": "Poll a job and retrieve one page of results."
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ],
+    "runtimes": {
+      "python": ">=3.12 <3.13"
+    }
+  },
+  "keywords": [
+    "google",
+    "bigquery",
+    "analytics",
+    "sql"
+  ],
+  "license": "MIT"
+}
