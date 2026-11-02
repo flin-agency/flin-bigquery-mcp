@@ -60,6 +60,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           name: python-dist
@@ -68,7 +69,6 @@ jobs:
         with:
           name: mac-extension
           path: release-assets
-      - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.12'
