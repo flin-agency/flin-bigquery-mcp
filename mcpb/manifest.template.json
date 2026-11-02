@@ -3,7 +3,7 @@
   "name": "flin-bigquery-mcp",
   "display_name": "flin BigQuery",
   "description": "Explore BigQuery datasets and run read-only SQL with per-query byte limits.",
-  "long_description": "Connect Google BigQuery to Claude Desktop on macOS. Browse projects, datasets, schemas and table previews. SELECT queries are checked with a dry run and a configurable byte ceiling before submission; they can incur Google Cloud charges. Requires a Desktop OAuth client and BigQuery permissions. Tokens are stored locally. No table write tools are exposed.",
+  "long_description": "Connect Google BigQuery to Claude Desktop on macOS. Browse projects, datasets, schemas and table previews. SELECT queries are checked with a dry run and a configurable byte ceiling before submission; they can incur Google Cloud charges. Requires a Desktop OAuth client and BigQuery permissions. Tokens are stored locally. No table write tools are exposed. On every server start, the launcher checks PyPI and runs the latest stable version compatible with Python 3.12. Internet access is required for update checks. Restart Claude Desktop to pick up a newly published version.",
   "author": {
     "name": "flin GmbH",
     "email": "flin@flin.agency",
@@ -28,12 +28,18 @@
       "command": "uv",
       "args": [
         "run",
-        "--directory",
-        "${__dirname}",
-        "--locked",
-        "--no-dev",
+        "--no-project",
+        "--no-config",
         "--python",
         "3.12",
+        "--default-index",
+        "https://pypi.org/simple",
+        "--resolution",
+        "highest",
+        "--prerelease",
+        "disallow",
+        "--upgrade-package",
+        "flin-bigquery-mcp",
         "${__dirname}/server.py"
       ],
       "env": {
@@ -138,5 +144,6 @@
     "analytics",
     "sql"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "tools_generated": true
 }

@@ -4,11 +4,17 @@ MCP server for exploring Google BigQuery and running bounded, read-only GoogleSQ
 
 ## Mac installation (Claude Desktop)
 
-Download `flin-bigquery-mcp-0.1.0-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
+Download `flin-bigquery-mcp-0.1.1-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
 
 The installer asks for your Google Desktop OAuth client ID and secret, default billing project, optional BigQuery location, and maximum bytes billed per query (default 1 GiB). Configure Google Cloud as described below before the first data request. Google sign-in opens in the browser when needed.
 
-The extension contains the server source and a dependency lock file. It uses the MCPB `uv` runtime with Python 3.12, supports Apple Silicon and Intel Macs, and needs internet access on first launch to install Python/dependencies. A current Claude Desktop version with `uv` extension support is required. The `.mcpb` is an unsigned local extension, not a notarized macOS application; it does not require administrator access or a separate repository checkout. For other MCP clients, use the PyPI or source configuration below.
+The extension contains a small launcher that checks PyPI on every MCP server start and runs the latest stable `flin-bigquery-mcp` version compatible with Python 3.12. It does not contain a frozen copy of the server. It uses the MCPB `uv` runtime with Python 3.12, supports Apple Silicon and Intel Macs, and needs internet access at startup to check for updates and download changed dependencies. A current Claude Desktop version with `uv` extension support is required. The `.mcpb` is an unsigned local extension, not a notarized macOS application; it does not require administrator access or a separate repository checkout. For other MCP clients, use the PyPI or source configuration below.
+
+### Updates after installation
+
+Install the new 0.1.1 `.mcpb` once to replace the old 0.1.0 bundle. From then on, fully quit and reopen Claude Desktop after a new PyPI release; the launcher refreshes the package even when an older version is cached. An already running server does not update in the middle of a conversation. If the update check fails, startup reports an error; it does not silently fall back to an old version.
+
+Saved Google tokens keep their existing location. Claude's extension version refers to the launcher; `health_check.server_version` shows the actual running PyPI server version. Changes to the installation form, launcher or supported Python version still require a new `.mcpb`. Ordinary server fixes and tool additions arrive through PyPI. The source-checkout configuration below remains locked to the checkout and is not affected by this update mechanism.
 
 ## Quickstart
 

@@ -11,6 +11,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from . import __version__
 from .auth import AuthenticationError, AuthenticationRequiredError, describe_auth_state
 from .bigquery import (
     BigQueryService,
@@ -112,6 +113,7 @@ def health_check(account: str | None = None) -> dict[str, Any]:
         return {
             "ok": False,
             "status": "missing_configuration",
+            "server_version": __version__,
             "missing_env_vars": missing,
         }
     settings = load_settings()
@@ -119,6 +121,7 @@ def health_check(account: str | None = None) -> dict[str, Any]:
     return {
         "ok": auth["status"] in {"ready", "refreshable"},
         **auth,
+        "server_version": __version__,
         "auth_mode": settings.auth_mode,
         "default_project": settings.default_project,
         "location": settings.location,

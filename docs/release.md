@@ -11,3 +11,5 @@ The project follows the flin GitHub Actions / PyPI Trusted Publisher release mod
 Manual workflow dispatch builds artifacts only; publication requires a version tag. Configure GitHub's `pypi` environment protection as appropriate for the organization.
 
 After PyPI publication succeeds, the workflow creates a GitHub release with the Python distributions, the macOS `.mcpb` extension and `SHA256SUMS`. The extension is staged from an explicit runtime allowlist; development files, credentials and local environments are excluded.
+
+The desktop bundle from 0.1.1 onward is an updating launcher. Pre-publication bundle tests run the currently published PyPI server; the source tests cover the candidate release. After publishing, verify the unchanged bundle with `scripts/check_mcpb.py --expected-server-version X.Y.Z` before attaching it to the GitHub release. Future server-only PyPI releases are picked up on the next extension start. Launcher metadata and configuration changes still require reinstalling the new bundle.

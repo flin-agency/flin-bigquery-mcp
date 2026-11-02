@@ -1,4 +1,8 @@
-"""Entry point for the installed Claude Desktop extension."""
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["flin-bigquery-mcp"]
+# ///
+"""Load the PyPI server; uv refreshes this dependency on every extension start."""
 
 from flin_bigquery_mcp.server import main
 

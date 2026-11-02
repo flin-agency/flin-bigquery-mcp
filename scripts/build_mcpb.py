@@ -74,8 +74,6 @@ def stage_bundle(root: Path, destination: Path, *, tag: str | None = None) -> di
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     for name in (
-        "pyproject.toml",
-        "uv.lock",
         "README.md",
         "PRIVACY.md",
         "LICENSE",
@@ -84,14 +82,6 @@ def stage_bundle(root: Path, destination: Path, *, tag: str | None = None) -> di
         _copy_file(root / name, destination / name)
     _copy_file(root / "assets" / "icon.png", destination / "icon.png")
     _copy_file(root / "mcpb" / "server.py", destination / "server.py")
-    source_dir = root / "src" / PACKAGE
-    if source_dir.is_symlink():
-        raise ValueError("The package directory must not be a symlink.")
-    for source in sorted(source_dir.rglob("*")):
-        if source.is_symlink():
-            raise ValueError("Symlinks are not allowed in the runtime package.")
-        if source.is_file() and source.suffix == ".py":
-            _copy_file(source, destination / source.relative_to(root))
     return manifest
 
 

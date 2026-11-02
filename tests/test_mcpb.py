@@ -13,33 +13,39 @@ spec.loader.exec_module(builder)
 
 
 def test_bundle_contains_only_runtime_files_and_portable_configuration(tmp_path):
-    manifest = builder.stage_bundle(ROOT, tmp_path, tag="v0.1.0")
+    manifest = builder.stage_bundle(
+        ROOT, tmp_path, tag=f"v{builder.release_version(ROOT)}"
+    )
     files = {
         p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()
     }
     assert files == {
         "manifest.json",
         "server.py",
-        "pyproject.toml",
-        "uv.lock",
         "README.md",
         "PRIVACY.md",
         "LICENSE",
         "SUPPORT.md",
         "icon.png",
-        *{
-            f"src/flin_bigquery_mcp/{name}.py"
-            for name in ("__init__", "auth", "config", "bigquery", "server")
-        },
     }
     assert manifest["compatibility"]["platforms"] == ["darwin"]
     assert manifest["user_config"]["google_client_secret"]["sensitive"]
     config = manifest["server"]["mcp_config"]
-    assert "--locked" in config["args"]
+    assert "--no-project" in config["args"]
+    assert (
+        '# dependencies = ["flin-bigquery-mcp"]' in (tmp_path / "server.py").read_text()
+    )
+    assert (
+        config["args"][config["args"].index("--upgrade-package") + 1]
+        == "flin-bigquery-mcp"
+    )
+    assert manifest["tools_generated"] is True
     assert "${__dirname}/server.py" in config["args"]
     assert config["env"]["GOOGLE_BIGQUERY_AUTH_MODE"] == "oauth"
     assert len(manifest["tools"]) == 10
-    assert json.loads((tmp_path / "manifest.json").read_text())["version"] == "0.1.0"
+    assert json.loads((tmp_path / "manifest.json").read_text())[
+        "version"
+    ] == builder.release_version(ROOT)
 
 
 def test_mismatched_tag_cannot_be_released():
@@ -68,7 +74,7 @@ def test_archive_is_reproducible_and_matches_staged_files(tmp_path):
     builder.build_bundle(ROOT, tmp_path)
     assert output.read_bytes() == first
     with zipfile.ZipFile(output) as archive:
-        assert len(archive.namelist()) == len(set(archive.namelist())) == 14
+        assert len(archive.namelist()) == len(set(archive.namelist())) == 7
         assert archive.testzip() is None
         assert "manifest.json" in archive.namelist()
         assert not any(
