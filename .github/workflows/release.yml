@@ -49,17 +49,17 @@ jobs:
           gh release download v0.1.2 --repo flin-agency/flin-bigquery-mcp --pattern 'flin-bigquery-mcp-0.1.2-macos.mcpb' --dir compatibility-bundle
           printf '%s  %s\n' '1905fd0197777729a8e0b36d1e56504519b7b4bd7cf0cdf64e36643de76e76d9' 'compatibility-bundle/flin-bigquery-mcp-0.1.2-macos.mcpb' | shasum -a 256 -c -
           uv run python scripts/check_mcpb.py compatibility-bundle --installed-bundle --server-wheel dist/python
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-dist
           path: dist/python/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mac-extension
           path: dist/mcpb/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installed-mac-extension
           path: compatibility-bundle/*.mcpb
