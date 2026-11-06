@@ -72,6 +72,7 @@ async def check_bundle(
     bundle: Path,
     expected_server_version: str | None = None,
     server_wheel: Path | None = None,
+    installed_bundle: bool = False,
 ) -> None:
     if server_wheel is not None:
         if server_wheel.is_dir():
@@ -155,13 +156,19 @@ async def check_bundle(
             args=arguments,
             env=environment,
         )
-        assert {tool["name"] for tool in manifest["tools"]} == EXPECTED_TOOLS
+        manifest_tools = {tool["name"] for tool in manifest["tools"]}
+        if installed_bundle:
+            # An installed manifest predates newly added tools. MCP tool discovery
+            # must expose the current server's tools without reinstalling the bundle.
+            assert manifest_tools <= EXPECTED_TOOLS
+        else:
+            assert manifest_tools == EXPECTED_TOOLS
         await verify_server(parameters, expected_server_version)
         assert not (root / "test-tokens").exists(), (
             "Smoke test must never start OAuth or write tokens."
         )
         print(
-            f"Bundle {manifest['version']}: 10 tools, configuration, annotations and validation verified."
+            f"Bundle {manifest['version']}: {len(EXPECTED_TOOLS)} tools, configuration, annotations and validation verified."
         )
 
 
@@ -170,6 +177,11 @@ def main() -> None:
     parser.add_argument("bundle", type=Path)
     parser.add_argument("--expected-server-version")
     parser.add_argument(
+        "--installed-bundle",
+        action="store_true",
+        help="Verify a previously installed launcher against the current server tools.",
+    )
+    parser.add_argument(
         "--server-wheel",
         type=Path,
         help="Candidate wheel or directory for pre-publication testing.",
@@ -177,7 +189,10 @@ def main() -> None:
     args = parser.parse_args()
     asyncio.run(
         check_bundle(
-            args.bundle.resolve(), args.expected_server_version, args.server_wheel
+            args.bundle.resolve(),
+            args.expected_server_version,
+            args.server_wheel,
+            args.installed_bundle,
         )
     )
 

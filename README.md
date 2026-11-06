@@ -12,6 +12,8 @@ The extension contains a small launcher that checks PyPI on every MCP server sta
 
 ### Updates after installation
 
+Every published release includes both the PyPI server and a newly built Mac installer. **Existing installations update the server automatically from PyPI; you do not need to download or reinstall each new `.mcpb`.** The release workflow checks that the unchanged 0.1.2 launcher can run the new version, including tools discovered from the server.
+
 Install the 0.1.2 `.mcpb` to require server 0.1.2 or newer. This includes the security corrections described in [the security review](docs/security-review-0.1.2.md). From then on, fully quit and reopen Claude Desktop after a new PyPI release; the launcher refreshes the package even when an older version is cached. An already running server does not update in the middle of a conversation. If the update check fails, startup reports an error; it does not silently fall back to an old version.
 
 Saved Google tokens keep their existing location. Claude's extension version refers to the launcher; `health_check.server_version` shows the actual running PyPI server version. Changes to the installation form, launcher or supported Python version still require a new `.mcpb`. Ordinary server fixes and tool additions arrive through PyPI. The source-checkout configuration below remains locked to the checkout and is not affected by this update mechanism.

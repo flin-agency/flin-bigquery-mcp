@@ -25,6 +25,12 @@ jobs:
       - run: uv run ruff check src tests scripts mcpb
       - run: uv run ruff format --check src tests scripts mcpb
       - run: uv run python scripts/check_release.py
+      - name: Require release notes before publishing
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test -s "docs/release-notes-${GITHUB_REF_NAME#v}.md"
+          fi
       - run: uv build --out-dir dist/python
       - name: Build and validate Mac extension
         shell: bash
@@ -35,6 +41,14 @@ jobs:
             uv run python scripts/build_mcpb.py
           fi
       - run: uv run python scripts/check_mcpb.py dist/mcpb --server-wheel dist/python
+      - name: Verify compatibility with the already installed 0.1.2 launcher
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release download v0.1.2 --repo flin-agency/flin-bigquery-mcp --pattern 'flin-bigquery-mcp-0.1.2-macos.mcpb' --dir compatibility-bundle
+          printf '%s  %s\n' '1905fd0197777729a8e0b36d1e56504519b7b4bd7cf0cdf64e36643de76e76d9' 'compatibility-bundle/flin-bigquery-mcp-0.1.2-macos.mcpb' | shasum -a 256 -c -
+          uv run python scripts/check_mcpb.py compatibility-bundle --installed-bundle --server-wheel dist/python
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: python-dist
@@ -44,6 +58,11 @@ jobs:
         with:
           name: mac-extension
           path: dist/mcpb/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: installed-mac-extension
+          path: compatibility-bundle/*.mcpb
           if-no-files-found: error
   publish-pypi:
     needs: build
@@ -78,6 +97,10 @@ jobs:
         with:
           name: mac-extension
           path: release-assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: installed-mac-extension
+          path: compatibility-bundle
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: '3.12'
@@ -86,6 +109,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: uv run python scripts/check_mcpb.py release-assets --expected-server-version "${RELEASE_TAG#v}"
+      - name: Verify installed launcher receives the new PyPI server
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: uv run python scripts/check_mcpb.py compatibility-bundle --installed-bundle --expected-server-version "${RELEASE_TAG#v}"
       - name: Publish release downloads
         env:
           GH_TOKEN: ${{ github.token }}
