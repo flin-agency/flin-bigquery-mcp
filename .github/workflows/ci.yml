@@ -11,17 +11,24 @@ jobs:
         python: ['3.10', '3.12']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra dev
+      - name: Audit locked dependencies
+        shell: bash
+        run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file audit-requirements.txt --quiet
+          uvx --python "${{ matrix.python }}" pip-audit==2.10.1 --disable-pip --no-deps -r audit-requirements.txt
       - run: uv run pytest
       - run: uv run ruff check src tests scripts mcpb
       - run: uv run ruff format --check src tests scripts mcpb
-      - run: uv build
+      - run: uv build --out-dir dist/python
       - run: uv run python scripts/check_release.py
       - run: uv run python scripts/build_mcpb.py
         if: matrix.os == 'macos-15-intel' && matrix.python == '3.12'
-      - run: uv run python scripts/check_mcpb.py dist/mcpb
+      - run: uv run python scripts/check_mcpb.py dist/mcpb --server-wheel dist/python
         if: matrix.os == 'macos-15-intel' && matrix.python == '3.12'

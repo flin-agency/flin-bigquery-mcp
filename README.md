@@ -4,7 +4,7 @@ MCP server for exploring Google BigQuery and running bounded, read-only GoogleSQ
 
 ## Mac installation (Claude Desktop)
 
-Download `flin-bigquery-mcp-0.1.1-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
+Download `flin-bigquery-mcp-0.1.2-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
 
 The installer asks for your Google Desktop OAuth client ID and secret, default billing project, optional BigQuery location, and maximum bytes billed per query (default 1 GiB). Configure Google Cloud as described below before the first data request. Google sign-in opens in the browser when needed.
 
@@ -12,7 +12,7 @@ The extension contains a small launcher that checks PyPI on every MCP server sta
 
 ### Updates after installation
 
-Install the new 0.1.1 `.mcpb` once to replace the old 0.1.0 bundle. From then on, fully quit and reopen Claude Desktop after a new PyPI release; the launcher refreshes the package even when an older version is cached. An already running server does not update in the middle of a conversation. If the update check fails, startup reports an error; it does not silently fall back to an old version.
+Install the 0.1.2 `.mcpb` to require server 0.1.2 or newer. This includes the security corrections described in [the security review](docs/security-review-0.1.2.md). From then on, fully quit and reopen Claude Desktop after a new PyPI release; the launcher refreshes the package even when an older version is cached. An already running server does not update in the middle of a conversation. If the update check fails, startup reports an error; it does not silently fall back to an old version.
 
 Saved Google tokens keep their existing location. Claude's extension version refers to the launcher; `health_check.server_version` shows the actual running PyPI server version. Changes to the installation form, launcher or supported Python version still require a new `.mcpb`. Ordinary server fixes and tool additions arrive through PyPI. The source-checkout configuration below remains locked to the checkout and is not affected by this update mechanism.
 
@@ -123,7 +123,7 @@ Default OAuth token paths:
 - Linux: `~/.config/flin-bigquery-mcp/token.json`
 - Windows: `%APPDATA%\flin-bigquery-mcp\token.json`
 
-Use `account: "work"` to keep another account in `work.json`. Account names allow letters, digits, `_`, `-`, `.` and cannot alias the default token file. Tokens are written atomically, with private file permissions on POSIX. Use a private directory owned by your user. Named accounts refer to separate sign-ins, not Google account IDs.
+Use `account: "work"` to keep another account in `work.json`. Account names allow letters, digits, `_`, `-`, `.` and cannot alias the default token file. Tokens are written atomically, with private file permissions on POSIX. Reads reject symlinks, hard links, non-regular files, oversized or malformed token data, and (on POSIX) files owned by another user or accessible to group/others. OAuth explicitly enables PKCE. Use a private directory owned by your user. Named accounts refer to separate sign-ins, not Google account IDs.
 
 For service accounts, workload identity, or existing `gcloud auth application-default login` credentials:
 
@@ -144,20 +144,21 @@ uv sync --locked --extra dev
 uv run pytest
 uv run ruff check src tests scripts mcpb
 uv run ruff format --check src tests scripts mcpb
-uv build
+uv build --out-dir dist/python
 uv run python scripts/build_mcpb.py
-uv run python scripts/check_mcpb.py dist/mcpb
+uv run python scripts/check_mcpb.py dist/mcpb --server-wheel dist/python
 ```
 
 `.env.example` documents configuration. The server does not implicitly load `.env`; use client `env` settings or `uv run --env-file .env flin-bigquery-mcp` for local development. Never commit credentials or tokens.
 
 Tests run without credentials and mock Google API calls. They cover OAuth refresh/storage, account isolation, query rejection, byte ceilings, pagination, serialization, sanitized errors, and a real stdio MCP handshake/tool call. See [testing](docs/testing.md) for the optional live check.
 
-See [release instructions](docs/release.md), [privacy](PRIVACY.md), and [support](SUPPORT.md).
+See [security policy](SECURITY.md), [security review](docs/security-review-0.1.2.md), [release instructions](docs/release.md), [privacy](PRIVACY.md), and [support](SUPPORT.md).
 
 ## Troubleshooting
 
 - `missing_configuration` / `invalid_configuration`: check the selected authentication mode, required OAuth values, project, account name and positive byte ceiling.
+- `authentication_failed` / `invalid_token_file`: check that the token is a regular file owned by you, with mode `0600` on macOS/Linux, in a directory that other users cannot modify. Do not use linked token files. If a token was exposed to others, revoke it and sign in again.
 - `authentication_required`: complete Google sign-in or configure ADC. External OAuth apps in testing may require renewed consent.
 - `permission_denied`: check API enablement, job-user and data-viewer access, billing and quotas.
 - `not_found`: check IDs and the returned job location. An EU job cannot be fetched as a US job.

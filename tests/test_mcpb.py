@@ -33,7 +33,8 @@ def test_bundle_contains_only_runtime_files_and_portable_configuration(tmp_path)
     config = manifest["server"]["mcp_config"]
     assert "--no-project" in config["args"]
     assert (
-        '# dependencies = ["flin-bigquery-mcp"]' in (tmp_path / "server.py").read_text()
+        '# dependencies = ["flin-bigquery-mcp>=0.1.2"]'
+        in (tmp_path / "server.py").read_text()
     )
     assert (
         config["args"][config["args"].index("--upgrade-package") + 1]

@@ -51,6 +51,7 @@ def test_get_credentials_loads_valid_credentials_from_token_file(
 ) -> None:
     token_path = tmp_path / "token.json"
     token_path.write_text('{"token":"cached"}', encoding="utf-8")
+    token_path.chmod(0o600)
     credentials = FakeCredentials(valid=True)
 
     monkeypatch.setattr(
@@ -70,7 +71,9 @@ def test_get_credentials_loads_named_account_credentials_from_token_dir(
     default_token_path = tmp_path / "token.json"
     named_token_path = tmp_path / "work.json"
     default_token_path.write_text('{"token":"default"}', encoding="utf-8")
+    default_token_path.chmod(0o600)
     named_token_path.write_text('{"token":"work"}', encoding="utf-8")
+    named_token_path.chmod(0o600)
     credentials = FakeCredentials(valid=True)
     captured: dict[str, object] = {}
 
@@ -95,6 +98,7 @@ def test_get_credentials_refreshes_expired_credentials(
 ) -> None:
     token_path = tmp_path / "token.json"
     token_path.write_text('{"token":"expired"}', encoding="utf-8")
+    token_path.chmod(0o600)
     credentials = FakeCredentials(
         valid=False,
         expired=True,
@@ -130,6 +134,7 @@ def test_get_credentials_raises_clean_error_for_corrupted_token_file(
 ) -> None:
     token_path = tmp_path / "token.json"
     token_path.write_text("{not-json", encoding="utf-8")
+    token_path.chmod(0o600)
 
     with pytest.raises(auth.AuthenticationError):
         auth.get_credentials(settings=_settings(token_path), interactive=False)
@@ -203,6 +208,7 @@ def test_save_credentials_rejects_shared_writable_directory_without_changing_it(
     token_dir.chmod(mode)
     token_path = token_dir / "token.json"
     token_path.write_text('{"token":"original"}', encoding="utf-8")
+    token_path.chmod(0o600)
 
     with pytest.raises(auth.AuthenticationError, match="writable by other users"):
         auth.save_credentials(FakeCredentials(valid=True), token_path)
@@ -246,6 +252,7 @@ def test_save_credentials_rejects_symlink_directory_without_changing_target(
 def test_save_credentials_rejects_symlink_token_paths(tmp_path: Path) -> None:
     token_target = tmp_path / "outside-token.json"
     token_target.write_text('{"token":"original"}', encoding="utf-8")
+    token_target.chmod(0o600)
     token_path = tmp_path / "token.json"
     token_path.symlink_to(token_target)
     credentials = FakeCredentials(valid=True, payload={"token": "replacement"})
@@ -271,8 +278,9 @@ def test_run_installed_app_flow_suppresses_stdout_authorization_prompt(
     class FakeInstalledAppFlow:
         @staticmethod
         def from_client_config(
-            client_config: dict[str, object], scopes: tuple[str, ...]
+            client_config: dict[str, object], scopes: tuple[str, ...], **kwargs
         ) -> FakeFlow:
+            captured["flow_options"] = kwargs
             captured["client_config"] = client_config
             captured["scopes"] = scopes
             return FakeFlow()
@@ -282,6 +290,7 @@ def test_run_installed_app_flow_suppresses_stdout_authorization_prompt(
     result = auth._run_installed_app_flow(_settings(tmp_path / "token.json"))
 
     assert result == "credentials"
+    assert captured["flow_options"] == {"autogenerate_code_verifier": True}
     assert captured["scopes"] == auth.BIGQUERY_SCOPES
     assert captured["kwargs"]["prompt"] == "consent select_account"
     assert captured["kwargs"]["authorization_prompt_message"] == ""
@@ -306,6 +315,7 @@ def test_describe_auth_state_uses_named_account_token(
     default_token_path = tmp_path / "token.json"
     named_token_path = tmp_path / "work.json"
     named_token_path.write_text('{"token":"work"}', encoding="utf-8")
+    named_token_path.chmod(0o600)
 
     monkeypatch.setattr(
         auth,
@@ -329,6 +339,7 @@ def test_describe_auth_state_omits_token_path_from_invalid_token_errors(
 ) -> None:
     token_path = tmp_path / "token.json"
     token_path.write_text("{not-json", encoding="utf-8")
+    token_path.chmod(0o600)
 
     state = auth.describe_auth_state(settings=_settings(token_path))
 
@@ -373,3 +384,126 @@ def test_adc_health_is_offline_and_named_accounts_rejected(tmp_path, monkeypatch
     assert auth.describe_auth_state(settings=settings)["status"] == "adc_not_checked"
     with pytest.raises(auth.AuthenticationError):
         auth.get_credentials(settings=settings, account="work")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX filesystem protections")
+@pytest.mark.parametrize(
+    "unsafe",
+    [
+        "symlink",
+        "dangling_symlink",
+        "hardlink",
+        "fifo",
+        "directory",
+        "public",
+        "shared_parent",
+        "symlink_parent",
+        "wrong_owner",
+        "swapped",
+    ],
+)
+def test_unsafe_tokens_are_rejected_before_credentials_or_oauth(
+    tmp_path, monkeypatch, unsafe
+):
+    token_dir = tmp_path / "tokens"
+    token_dir.mkdir(mode=0o700)
+    token = token_dir / "token.json"
+    token.write_text('{"token":"must-not-load"}')
+    token.chmod(0o600)
+    if unsafe in {"symlink", "dangling_symlink"}:
+        target = tmp_path / "target.json"
+        token.rename(target)
+        if unsafe == "dangling_symlink":
+            target.unlink()
+        token.symlink_to(target)
+    elif unsafe == "hardlink":
+        os.link(token, tmp_path / "alias.json")
+    elif unsafe == "fifo":
+        token.unlink()
+        os.mkfifo(token)
+    elif unsafe == "directory":
+        token.unlink()
+        token.mkdir()
+    elif unsafe == "public":
+        token.chmod(0o644)
+    elif unsafe == "shared_parent":
+        token_dir.chmod(0o777)
+    elif unsafe == "symlink_parent":
+        target = tmp_path / "real-directory"
+        token_dir.rename(target)
+        token_dir.symlink_to(target, target_is_directory=True)
+    elif unsafe == "wrong_owner":
+        original_fstat = os.fstat
+
+        def wrong_owner(fd):
+            values = list(original_fstat(fd))
+            values[4] += 1
+            return os.stat_result(values)
+
+        monkeypatch.setattr(auth.os, "fstat", wrong_owner)
+    elif unsafe == "swapped":
+        original_open = os.open
+
+        def swap_before_open(path, flags):
+            token.rename(token_dir / "old.json")
+            token.write_text('{"token":"replacement"}')
+            token.chmod(0o600)
+            return original_open(path, flags)
+
+        monkeypatch.setattr(auth.os, "open", swap_before_open)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Unsafe token must never reach credentials or OAuth")
+
+    monkeypatch.setattr(auth, "_build_credentials_from_info", unexpected)
+    monkeypatch.setattr(auth, "_run_installed_app_flow", unexpected)
+    with pytest.raises(auth.AuthenticationError):
+        auth.get_credentials(settings=_settings(token))
+    if unsafe != "swapped":
+        state = auth.describe_auth_state(settings=_settings(token))
+        assert state["status"] == "invalid_token_file"
+        assert "must-not-load" not in str(state)
+
+
+@pytest.mark.parametrize("contents", [b"[]", b"null", b'"text"', b"\xff", b" " * 65537])
+def test_invalid_token_content_is_bounded_and_sanitized(tmp_path, contents):
+    token = tmp_path / "token.json"
+    token.write_bytes(contents)
+    token.chmod(0o600)
+    with pytest.raises(auth.AuthenticationError):
+        auth._load_token_info(token)
+    assert (
+        auth.describe_auth_state(settings=_settings(token))["status"]
+        == "invalid_token_file"
+    )
+
+
+def test_health_check_does_not_create_token_directory(tmp_path):
+    token = tmp_path / "not-created" / "token.json"
+    assert (
+        auth.describe_auth_state(settings=_settings(token))["status"]
+        == "oauth_required"
+    )
+    assert not token.parent.exists()
+
+
+def test_real_oauth_flow_includes_pkce_challenge(tmp_path, monkeypatch):
+    from urllib.parse import parse_qs, urlparse
+
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    def inspect_authorization(self, **kwargs):
+        self.redirect_uri = "http://127.0.0.1:12345/"
+        url, state = self.authorization_url()
+        params = parse_qs(urlparse(url).query)
+        assert state
+        assert params["code_challenge_method"] == ["S256"]
+        assert len(params["code_challenge"][0]) == 43
+        assert self.code_verifier
+        return "credentials"
+
+    monkeypatch.setattr(InstalledAppFlow, "run_local_server", inspect_authorization)
+    assert (
+        auth._run_installed_app_flow(_settings(tmp_path / "token.json"))
+        == "credentials"
+    )

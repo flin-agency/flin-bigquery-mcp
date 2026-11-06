@@ -10,6 +10,7 @@ import shutil
 import tempfile
 import zipfile
 from datetime import timedelta
+from email.parser import BytesParser
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
@@ -53,7 +54,7 @@ async def verify_server(
                     == expected_server_version
                 )
             print(
-                "Running PyPI server:",
+                "Running server:",
                 health.structuredContent.get("server_version", "pre-0.1.1"),
             )
             assert health.structuredContent["status"] == "oauth_required"
@@ -68,8 +69,24 @@ async def verify_server(
 
 
 async def check_bundle(
-    bundle: Path, expected_server_version: str | None = None
+    bundle: Path,
+    expected_server_version: str | None = None,
+    server_wheel: Path | None = None,
 ) -> None:
+    if server_wheel is not None:
+        if server_wheel.is_dir():
+            wheels = list(server_wheel.glob("flin_bigquery_mcp-*.whl"))
+            if len(wheels) != 1:
+                raise ValueError("Expected exactly one candidate server wheel.")
+            server_wheel = wheels[0]
+        server_wheel = server_wheel.resolve(strict=True)
+        with zipfile.ZipFile(server_wheel) as wheel:
+            metadata_path = next(
+                n for n in wheel.namelist() if n.endswith(".dist-info/METADATA")
+            )
+            metadata = BytesParser().parsebytes(wheel.read(metadata_path))
+            assert metadata["Name"] == "flin-bigquery-mcp"
+            expected_server_version = expected_server_version or metadata["Version"]
     if bundle.is_dir():
         candidates = list(bundle.glob("*.mcpb"))
         if len(candidates) != 1:
@@ -115,9 +132,27 @@ async def check_bundle(
         for key in ("UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"):
             if key in os.environ:
                 environment[key] = os.environ[key]
+        arguments = [substitute(value) for value in config["args"]]
+        if server_wheel is not None:
+            # Substitute only the dependency source in the temporary launcher.
+            # uv --with uses a separate layer and cannot override PEP 723 resolution.
+            # Post-publication checks omit this override and use the bundle unchanged.
+            launcher = root / manifest["server"]["entry_point"]
+            source = launcher.read_text(encoding="utf-8")
+            dependency_line = next(
+                line
+                for line in source.splitlines()
+                if line.startswith("# dependencies = ")
+            )
+            replacement = "# dependencies = " + json.dumps(
+                [f"flin-bigquery-mcp @ {server_wheel.as_uri()}"]
+            )
+            launcher.write_text(
+                source.replace(dependency_line, replacement, 1), encoding="utf-8"
+            )
         parameters = StdioServerParameters(
             command=uv,
-            args=[substitute(value) for value in config["args"]],
+            args=arguments,
             env=environment,
         )
         assert {tool["name"] for tool in manifest["tools"]} == EXPECTED_TOOLS
@@ -134,8 +169,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle", type=Path)
     parser.add_argument("--expected-server-version")
+    parser.add_argument(
+        "--server-wheel",
+        type=Path,
+        help="Candidate wheel or directory for pre-publication testing.",
+    )
     args = parser.parse_args()
-    asyncio.run(check_bundle(args.bundle.resolve(), args.expected_server_version))
+    asyncio.run(
+        check_bundle(
+            args.bundle.resolve(), args.expected_server_version, args.server_wheel
+        )
+    )
 
 
 if __name__ == "__main__":
