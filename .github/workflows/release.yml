@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -16,6 +16,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: uv sync --locked --extra dev
+      - name: Verify native Apple Silicon runtime
+        run: uv run python -c "import platform; assert platform.system() == 'Darwin' and platform.machine() == 'arm64'; print(platform.platform())"
       - name: Audit locked dependencies
         shell: bash
         run: |

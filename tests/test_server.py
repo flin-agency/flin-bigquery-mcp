@@ -43,6 +43,7 @@ def test_stdio_protocol_and_tool_validation():
                 tools = {tool.name: tool for tool in (await session.list_tools()).tools}
                 assert set(tools) == {
                     "health_check",
+                    "connection_status",
                     "list_projects",
                     "list_datasets",
                     "get_dataset",
@@ -60,6 +61,11 @@ def test_stdio_protocol_and_tool_validation():
                 assert not result.isError
                 payload = json.loads(result.content[0].text)
                 assert payload["status"] == "missing_configuration"
+                status = await session.call_tool("connection_status", {})
+                assert not status.isError
+                assert status.structuredContent["configuration_status"] == "incomplete"
+                assert status.structuredContent["live_access"] == "not_checked"
+                assert tools["connection_status"].annotations.openWorldHint is False
                 for size in (0, 1001):
                     invalid = await session.call_tool(
                         "list_projects", {"page_size": size}

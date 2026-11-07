@@ -3,7 +3,7 @@
   "name": "flin-bigquery-mcp",
   "display_name": "flin BigQuery",
   "description": "Explore BigQuery datasets and run read-only SQL with per-query byte limits.",
-  "long_description": "Connect Google BigQuery to Claude Desktop on macOS. Browse projects, datasets, schemas and table previews. SELECT queries are checked with a dry run and a configurable byte ceiling before submission; they can incur Google Cloud charges. Requires a Desktop OAuth client and BigQuery permissions. Tokens are stored locally. No table write tools are exposed. On every server start, the launcher checks PyPI and runs the latest stable version compatible with Python 3.12. Internet access is required for update checks. Restart Claude Desktop to pick up a newly published version.",
+  "long_description": "Connect Google BigQuery to Claude Desktop on macOS. Browse projects, datasets, schemas and table previews. SELECT queries are checked with a dry run and a configurable byte ceiling before submission; they can incur Google Cloud charges. Requires a Desktop OAuth client and BigQuery permissions. Tokens are stored locally. No table write tools are exposed. On every server start, the launcher checks PyPI and runs the latest stable 0.1.x version (at least 0.1.3), using Python 3.12 and the existing configuration contract. Internet access is required for update checks. Restart Claude Desktop to pick up a newly published version.",
   "author": {
     "name": "flin GmbH",
     "email": "flin@flin.agency",
@@ -89,6 +89,10 @@
     }
   },
   "tools": [
+    {
+      "name": "connection_status",
+      "description": "Check local setup and actual server version without Google requests or query costs."
+    },
     {
       "name": "health_check",
       "description": "Check local configuration and saved sign-in status."

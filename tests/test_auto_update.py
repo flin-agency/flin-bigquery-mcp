@@ -72,7 +72,15 @@ def make_wheel(directory, version):
     info = f"flin_bigquery_mcp-{version}.dist-info"
     contents = {
         "flin_bigquery_mcp/__init__.py": "",
-        "flin_bigquery_mcp/server.py": f'def main():\n    print("{version}")\n',
+        "flin_bigquery_mcp/server.py": f'''import os
+from pathlib import Path
+
+def main():
+    assert os.environ["GOOGLE_BIGQUERY_PROJECT"] == "saved-project"
+    assert os.environ["GOOGLE_BIGQUERY_MAX_BYTES_BILLED"] == "1073741824"
+    assert Path(os.environ["GOOGLE_BIGQUERY_TOKEN_PATH"]).read_text() == "synthetic-saved-token"
+    print("{version}")
+''',
         f"{info}/METADATA": f"Metadata-Version: 2.3\nName: flin-bigquery-mcp\nVersion: {version}\n",
         f"{info}/WHEEL": "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     }
@@ -104,7 +112,7 @@ def test_next_start_updates_cached_server_without_reinstalling_bundle(
     original = launcher.read_bytes()
     wheels = tmp_path / "package-index"
     wheels.mkdir()
-    make_wheel(wheels, "1.0.0")
+    make_wheel(wheels, "0.1.3")
     manifest = json.loads((ROOT / "mcpb" / "manifest.template.json").read_text())
     args = [
         arg.replace("${__dirname}", str(launcher.parent))
@@ -126,6 +134,14 @@ def test_next_start_updates_cached_server_without_reinstalling_bundle(
         UV_HTTP_TIMEOUT="3",
     )
 
+    token = tmp_path / "saved-token.json"
+    token.write_text("synthetic-saved-token")
+    environment.update(
+        GOOGLE_BIGQUERY_PROJECT="saved-project",
+        GOOGLE_BIGQUERY_MAX_BYTES_BILLED="1073741824",
+        GOOGLE_BIGQUERY_TOKEN_PATH=str(token),
+    )
+
     def start(*, check=True):
         return subprocess.run(
             [uv, *args],
@@ -139,16 +155,20 @@ def test_next_start_updates_cached_server_without_reinstalling_bundle(
 
     with package_index(wheels, index_kind) as (index_args, state):
         args[-1:-1] = index_args
-        assert start().stdout.strip() == "1.0.0"
+        assert start().stdout.strip() == "0.1.3"
         requests_before_update = state["requests"] if state else None
-        make_wheel(wheels, "1.0.1")
-        make_wheel(wheels, "2.0.0rc1")
-        assert start().stdout.strip() == "1.0.1"
+        make_wheel(wheels, "0.1.4")
+        make_wheel(wheels, "0.1.5rc1")
+        assert start().stdout.strip() == "0.1.4"
         if state:
             assert state["requests"] > requests_before_update
-        make_wheel(wheels, "2.0.0")
-        assert start().stdout.strip() == "2.0.0"
+        make_wheel(wheels, "0.2.0")
+        make_wheel(wheels, "1.0.0")
+        assert start().stdout.strip() == "0.1.4"
+        make_wheel(wheels, "0.1.5")
+        assert start().stdout.strip() == "0.1.5"
         assert launcher.read_bytes() == original
+        assert token.read_text() == "synthetic-saved-token"
         if state:
             state["available"] = False
             failed = start(check=False)

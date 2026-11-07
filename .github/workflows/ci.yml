@@ -9,6 +9,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-15-intel, windows-latest]
         python: ['3.10', '3.12']
+        include:
+          - os: macos-15
+            python: '3.12'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -29,6 +32,6 @@ jobs:
       - run: uv build --out-dir dist/python
       - run: uv run python scripts/check_release.py
       - run: uv run python scripts/build_mcpb.py
-        if: matrix.os == 'macos-15-intel' && matrix.python == '3.12'
+        if: startsWith(matrix.os, 'macos-15') && matrix.python == '3.12'
       - run: uv run python scripts/check_mcpb.py dist/mcpb --server-wheel dist/python
-        if: matrix.os == 'macos-15-intel' && matrix.python == '3.12'
+        if: startsWith(matrix.os, 'macos-15') && matrix.python == '3.12'

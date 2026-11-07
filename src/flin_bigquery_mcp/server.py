@@ -130,6 +130,55 @@ def health_check(account: str | None = None) -> dict[str, Any]:
     }
 
 
+@_tool("Check BigQuery connection status", external=False)
+def connection_status(account: str | None = None) -> dict[str, str]:
+    """Report local setup only: no network, browser, token refresh or query costs.
+
+    A saved token cannot prove Google still accepts it. Use list_datasets for an
+    explicit metadata access test; this status call never claims live access.
+    """
+    result = {
+        "server_version": __version__,
+        "configuration_status": "incomplete",
+        "auth_status": "unknown",
+        "live_access": "not_checked",
+        "next_step": "Enter the Google Desktop OAuth client values supplied by your administrator.",
+    }
+    try:
+        settings = load_settings()
+    except ConfigurationError:
+        result["next_step"] = (
+            "Check OAuth client values, authentication mode and the positive query byte limit."
+        )
+        return result
+    result["configuration_status"] = "configured"
+    try:
+        auth = describe_auth_state(settings=settings, account=account)
+    except ConfigurationError:
+        result["configuration_status"] = "incomplete"
+        result["next_step"] = (
+            "Use a valid account name or omit account for the default sign-in."
+        )
+        return result
+    except (AuthenticationError, OSError):
+        result["next_step"] = (
+            "Check the selected account and private token storage; ADC does not support named accounts."
+        )
+        return result
+    if auth["status"] in {"oauth_required", "invalid_token_file"}:
+        result["auth_status"] = "unauthenticated"
+        result["next_step"] = (
+            "Call list_projects and complete Google sign-in."
+            if auth["status"] == "oauth_required"
+            else "Check private token file permissions or revoke the old token and sign in again."
+        )
+    else:
+        result["next_step"] = (
+            "Call list_datasets with the intended project_id and page_size 1 to verify Google access without a query job."
+        )
+    return result
+
+
 @_tool("List BigQuery projects")
 def list_projects(
     account: str | None = None, page_size: PageSize = 50, page_token: str | None = None

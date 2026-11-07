@@ -78,6 +78,7 @@ def stage_bundle(root: Path, destination: Path, *, tag: str | None = None) -> di
         "PRIVACY.md",
         "LICENSE",
         "SUPPORT.md",
+        "SECURITY.md",
     ):
         _copy_file(root / name, destination / name)
     _copy_file(root / "assets" / "icon.png", destination / "icon.png")
@@ -124,8 +125,10 @@ def build_bundle(root: Path, output_dir: Path, *, tag: str | None = None) -> Pat
             if actual != expected:
                 raise RuntimeError("Packed files differ from the runtime allowlist.")
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
+    alias = output_dir / "flin-bigquery-mcp.mcpb"
+    shutil.copyfile(output, alias)
     (output_dir / "SHA256SUMS").write_text(
-        f"{checksum}  {output.name}\n", encoding="utf-8"
+        f"{checksum}  {output.name}\n{checksum}  {alias.name}\n", encoding="utf-8"
     )
     return output
 

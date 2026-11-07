@@ -17,6 +17,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 EXPECTED_TOOLS = {
+    "connection_status",
     "health_check",
     "list_projects",
     "list_datasets",
@@ -45,7 +46,19 @@ async def verify_server(
                 assert tool.annotations.readOnlyHint is (tool.name != "run_query")
                 assert tool.annotations.idempotentHint is (tool.name != "run_query")
                 assert tool.annotations.destructiveHint is False
-                assert tool.annotations.openWorldHint is (tool.name != "health_check")
+                assert tool.annotations.openWorldHint is (
+                    tool.name not in {"health_check", "connection_status"}
+                )
+            status = await client.call_tool("connection_status", {})
+            assert not status.isError
+            assert status.structuredContent == {
+                "server_version": expected_server_version
+                or status.structuredContent["server_version"],
+                "configuration_status": "configured",
+                "auth_status": "unauthenticated",
+                "live_access": "not_checked",
+                "next_step": "Call list_projects and complete Google sign-in.",
+            }
             health = await client.call_tool("health_check", {})
             assert not health.isError
             if expected_server_version is not None:
@@ -90,6 +103,12 @@ async def check_bundle(
             expected_server_version = expected_server_version or metadata["Version"]
     if bundle.is_dir():
         candidates = list(bundle.glob("*.mcpb"))
+        alias = bundle / "flin-bigquery-mcp.mcpb"
+        if alias in candidates and len(candidates) == 2:
+            versioned = next(p for p in candidates if p != alias)
+            if alias.read_bytes() != versioned.read_bytes():
+                raise ValueError("The stable alias must match the versioned installer.")
+            candidates.remove(alias)
         if len(candidates) != 1:
             raise ValueError(
                 "The bundle directory must contain exactly one .mcpb file."
@@ -155,6 +174,7 @@ async def check_bundle(
             command=uv,
             args=arguments,
             env=environment,
+            cwd=str(root),
         )
         manifest_tools = {tool["name"] for tool in manifest["tools"]}
         if installed_bundle:

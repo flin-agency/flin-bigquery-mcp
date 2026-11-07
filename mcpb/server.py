@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["flin-bigquery-mcp>=0.1.2"]
+# dependencies = ["flin-bigquery-mcp>=0.1.3,<0.2"]
 # ///
 """Load the PyPI server; uv refreshes this dependency on every extension start."""
 

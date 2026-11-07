@@ -26,6 +26,7 @@ def test_bundle_contains_only_runtime_files_and_portable_configuration(tmp_path)
         "PRIVACY.md",
         "LICENSE",
         "SUPPORT.md",
+        "SECURITY.md",
         "icon.png",
     }
     assert manifest["compatibility"]["platforms"] == ["darwin"]
@@ -33,7 +34,7 @@ def test_bundle_contains_only_runtime_files_and_portable_configuration(tmp_path)
     config = manifest["server"]["mcp_config"]
     assert "--no-project" in config["args"]
     assert (
-        '# dependencies = ["flin-bigquery-mcp>=0.1.2"]'
+        '# dependencies = ["flin-bigquery-mcp>=0.1.3,<0.2"]'
         in (tmp_path / "server.py").read_text()
     )
     assert (
@@ -43,7 +44,7 @@ def test_bundle_contains_only_runtime_files_and_portable_configuration(tmp_path)
     assert manifest["tools_generated"] is True
     assert "${__dirname}/server.py" in config["args"]
     assert config["env"]["GOOGLE_BIGQUERY_AUTH_MODE"] == "oauth"
-    assert len(manifest["tools"]) == 10
+    assert len(manifest["tools"]) == 11
     assert json.loads((tmp_path / "manifest.json").read_text())[
         "version"
     ] == builder.release_version(ROOT)
@@ -72,10 +73,11 @@ def test_archive_is_reproducible_and_matches_staged_files(tmp_path):
 
     output = builder.build_bundle(ROOT, tmp_path)
     first = output.read_bytes()
+    assert (tmp_path / "flin-bigquery-mcp.mcpb").read_bytes() == first
     builder.build_bundle(ROOT, tmp_path)
     assert output.read_bytes() == first
     with zipfile.ZipFile(output) as archive:
-        assert len(archive.namelist()) == len(set(archive.namelist())) == 7
+        assert len(archive.namelist()) == len(set(archive.namelist())) == 8
         assert archive.testzip() is None
         assert "manifest.json" in archive.namelist()
         assert not any(

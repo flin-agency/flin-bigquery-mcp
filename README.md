@@ -2,23 +2,27 @@
 
 MCP server for exploring Google BigQuery and running bounded, read-only GoogleSQL queries. Follows the Python/FastMCP, desktop OAuth, multi-account token storage and `uv` packaging conventions of [flin Search Console MCP](https://github.com/flin-agency/flin-google-search-console-mcp) and [flin Keyword Planner MCP](https://github.com/flin-agency/flin-google-keyword-planner-mcp).
 
-## Mac installation (Claude Desktop)
+## Claude Desktop on Mac (Apple Silicon M1 or newer)
 
-Download `flin-bigquery-mcp-0.1.2-macos.mcpb` from the [GitHub release](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) and open it with Claude Desktop. You can also use Claude Desktop's local extension installation dialog and select the file.
+1. [Download flin-bigquery-mcp.mcpb](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest/download/flin-bigquery-mcp.mcpb) and open it with a current Claude Desktop that supports `uv` extensions. Alternatively select the file in Claude Desktop's local extension installation dialog. [Versioned downloads and checksums](https://github.com/flin-agency/flin-bigquery-mcp/releases/latest) remain available. Intel Macs are also supported; source installation for other MCP clients is below.
+2. Enter the **Google Desktop OAuth client ID and secret** supplied by your administrator/password manager. Set the intended **billing project** and dataset location (for example `EU`) when provided. Keep **maximum bytes billed** at its default `1073741824` (1 GiB per query), unless your administrator deliberately specifies another limit. Never enter your Google account password in the extension settings.
+3. Ask Claude: **“Call connection_status for flin BigQuery.”** This checks local setup only, without opening a browser or incurring query costs. `configuration_status: configured` means the local configuration is valid, not that Google permissions have been verified.
+4. Ask: **“Call list_projects with page_size 1.”** Complete Google sign-in in the browser if prompted. This metadata request does not create a query job.
+5. Ask: **“Call list_datasets with project_id set to my intended data project and page_size 1.”** A successful response, including an empty list, verifies that metadata request for that identity/project. It does not prove access to every dataset or permission to create query jobs. The administrator grants **BigQuery Data Viewer** on the intended datasets and **BigQuery Job User** on the billing/job project; these may be different projects.
 
-The installer asks for your Google Desktop OAuth client ID and secret, default billing project, optional BigQuery location, and maximum bytes billed per query (default 1 GiB). Configure Google Cloud as described below before the first data request. Google sign-in opens in the browser when needed.
+**SELECT can incur costs even though it does not change source data.** `run_query` creates a potentially billable BigQuery job. The default hard ceiling is **1 GiB scanned/billed bytes per query**, not a monetary budget, total-session limit or complete cap on remote-function/external charges. A tool argument can lower this ceiling but cannot raise it. No live query is needed for the connection test above.
 
-The extension contains a small launcher that checks PyPI on every MCP server start and runs the latest stable `flin-bigquery-mcp` version compatible with Python 3.12. It does not contain a frozen copy of the server. It uses the MCPB `uv` runtime with Python 3.12, supports Apple Silicon and Intel Macs, and needs internet access at startup to check for updates and download changed dependencies. A current Claude Desktop version with `uv` extension support is required. The `.mcpb` is an unsigned local extension, not a notarized macOS application; it does not require administrator access or a separate repository checkout. For other MCP clients, use the PyPI or source configuration below.
+### Updates, versions and recovery
 
-### Updates after installation
+Every published server version ships on PyPI and with a fresh Mac installer on GitHub. After the first installation, fully quit and reopen Claude Desktop to load a compatible stable PyPI update. Running conversations are not interrupted; existing settings and token locations are preserved.
 
-Every published release includes both the PyPI server and a newly built Mac installer. **Existing installations update the server automatically from PyPI; you do not need to download or reinstall each new `.mcpb`.** The release workflow checks that the unchanged 0.1.2 launcher can run the new version, including tools discovered from the server.
+**Extension version** identifies the installed launcher/form. **`connection_status.server_version`** (also `health_check.server_version`) identifies the actual running server. These versions may differ after an automatic update.
 
-Install the 0.1.2 `.mcpb` to require server 0.1.2 or newer. This includes the security corrections described in [the security review](docs/security-review-0.1.2.md). From then on, fully quit and reopen Claude Desktop after a new PyPI release; the launcher refreshes the package even when an older version is cached. An already running server does not update in the middle of a conversation. If the update check fails, startup reports an error; it does not silently fall back to an old version.
+The launcher introduced in 0.1.3 accepts **`>=0.1.3,<0.2`**, excludes prereleases, and uses Python 3.12. The compatibility contract is the existing entry point, configuration variables, token locations and additive MCP tool discovery; these are checked on release. A later 0.2 line is not assumed compatible. Existing 0.1.1/0.1.2 launchers can obtain server 0.1.3 automatically, but their older manifests have no upper bound: import the new package once to adopt the bounded update policy. New mandatory launcher/UI/runtime changes can require a separately announced one-time import; ordinary compatible server updates do not.
 
-Saved Google tokens keep their existing location. Claude's extension version refers to the launcher; `health_check.server_version` shows the actual running PyPI server version. Changes to the installation form, launcher or supported Python version still require a new `.mcpb`. Ordinary server fixes and tool additions arrive through PyPI. The source-checkout configuration below remains locked to the checkout and is not affected by this update mechanism.
+The launcher needs internet access to check PyPI at startup. If the registry is unavailable it reports a startup error; it does **not** silently fall back to a cached version. Restore connectivity and restart first. If PyPI remains unavailable, an administrator can use the [prepared-checkout fallback](#prepared-checkout-fallback) below; Google access still requires internet. Tokens should not be deleted to troubleshoot a package-download problem. The `.mcpb` is an unsigned local extension, not an Apple-notarized app.
 
-## Quickstart
+## Administrator setup and other MCP clients
 
 1. Enable the **BigQuery API** in your Google Cloud project and configure billing for query jobs.
 2. Grant the Google account **BigQuery Job User** (`roles/bigquery.jobUser`) on the job/billing project and **BigQuery Data Viewer** (`roles/bigquery.dataViewer`) on the datasets to read. Metadata discovery also depends on the account's project/dataset permissions. Avoid using an admin identity.
@@ -56,6 +60,7 @@ The published package can be used with `"command": "uvx", "args": ["flin-bigquer
 
 | Tool | Purpose |
 | --- | --- |
+| `connection_status` | Common local status and actual server version; no network, browser, refresh or query job |
 | `health_check` | Local settings and saved-token status; does not verify Google access |
 | `list_projects` | One page of accessible projects |
 | `list_datasets` | One page of datasets in a project |
@@ -66,6 +71,8 @@ The published package can be used with `"command": "uvx", "args": ["flin-bigquer
 | `dry_run_query` | Validate a single SELECT and estimate scanned bytes |
 | `run_query` | Validate and submit a bounded SELECT; returns a job reference |
 | `get_query_results` | Poll a query job and page through its results |
+
+`connection_status` always returns `server_version`, `configuration_status` (`configured`/`incomplete`), `auth_status`, `live_access` and `next_step`. With a saved token or ADC, `auth_status` is `unknown`: only Google can verify that credentials are still accepted. Without an OAuth token it is `unauthenticated`. `live_access` is always `not_checked` for this local-only tool, even after a separate successful metadata request. It does not return credentials, local paths or project/data identifiers. The existing `health_check` fields remain available.
 
 All data tools support `account`. Project-specific tools use `project_id`, falling back to `GOOGLE_BIGQUERY_PROJECT`. Pass dataset and table IDs separately, without project prefixes. `list_projects` works without a default project. Query `project_id` determines where the job is created and billed; fully qualified SQL can read another accessible project.
 
@@ -138,6 +145,16 @@ For service accounts, workload identity, or existing `gcloud auth application-de
 ```
 
 Optionally set `GOOGLE_APPLICATION_CREDENTIALS` to a credential file outside the repository. ADC mode does not support named `account` values. `health_check` always returns `adc_not_checked` with `ok: false` in ADC mode; verify access through a data tool. It never contacts metadata servers or opens a browser to probe ADC. Grant the ADC identity the same minimal BigQuery roles.
+
+## Prepared-checkout fallback
+
+For a PyPI outage, an administrator may use an already reviewed checkout of a known stable release whose locked dependencies and Python runtime were installed beforehand. Keep the same Google settings and token paths, and temporarily use this MCP command instead of the extension:
+
+```sh
+uv run --offline --locked --directory /absolute/path/to/prepared-checkout flin-bigquery-mcp
+```
+
+This is an explicit fallback to that checkout's version, not an automatic downgrade. It fails if the needed runtime/dependencies are not already available. Google API access still needs connectivity. Return to the normal extension and restart once PyPI recovers. For deployment help see [SUPPORT.md](SUPPORT.md).
 
 ## Development
 
